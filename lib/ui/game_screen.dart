@@ -4,6 +4,7 @@ import '../logic/rules.dart';
 import '../logic/forbidden_moves.dart';
 import '../ai/ai_engine.dart';
 import 'board_widget.dart';
+import 'home_screen.dart';
 
 class GameScreen extends StatefulWidget {
   final GameMode gameMode;

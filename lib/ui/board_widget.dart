@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import '../logic/board.dart';
-import '../logic/rules.dart';
 import '../logic/forbidden_moves.dart';
 
 class BoardWidget extends StatelessWidget {

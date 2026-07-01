@@ -76,10 +76,10 @@ class Board {
 
   Board clone() {
     return Board.fromState(
-      _grid.map((row) => List.from(row)).toList(),
+      _grid.map((row) => List<int>.from(row)).toList(),
       _currentPlayer,
-      List.from(_lastMove),
-      _history.map((h) => List.from(h)).toList(),
+      List<int>.from(_lastMove),
+      _history.map((h) => List<int>.from(h)).toList(),
     );
   }
 

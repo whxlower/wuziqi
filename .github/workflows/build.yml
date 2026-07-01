@@ -29,19 +29,27 @@ jobs:
 
       - name: Create Flutter project
         run: |
-          flutter create --org com.example gomoku_build
-          rm -rf gomoku_build/lib
-          cp -r lib gomoku_build/
-          cp pubspec.yaml gomoku_build/
+          flutter create --org com.example gomoku
+
+      - name: Replace source code
+        run: |
+          rm -rf gomoku/lib
+          cp -r lib gomoku/
+          cp pubspec.yaml gomoku/
+
+      - name: Analyze code
+        run: |
+          cd gomoku
+          flutter analyze
 
       - name: Build APK
         run: |
-          cd gomoku_build
+          cd gomoku
           flutter pub get
-          flutter build apk --release
+          flutter build apk --release --verbose
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: gomoku-apk
-          path: gomoku_build/build/app/outputs/flutter-apk/app-release.apk
+          path: gomoku/build/app/outputs/flutter-apk/app-release.apk

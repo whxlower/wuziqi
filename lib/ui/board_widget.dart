@@ -20,22 +20,28 @@ class BoardWidget extends StatelessWidget {
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        double size = constraints.maxWidth;
+        double maxWidth = constraints.maxWidth;
+        double maxHeight = constraints.maxHeight;
+        double boardDimension = maxWidth < maxHeight ? maxWidth : maxHeight;
+        double padding = boardDimension * 0.05;
+        double boardSize = boardDimension - padding * 2;
         return GestureDetector(
           onTapUp: (details) {
-            double dx = details.localPosition.dx;
-            double dy = details.localPosition.dy;
-            double cellSize = size / (Board.SIZE - 1);
+            double dx = details.localPosition.dx - padding;
+            double dy = details.localPosition.dy - padding;
+            double cellSize = boardSize / (Board.SIZE - 1);
             int col = (dx / cellSize).round().clamp(0, Board.SIZE - 1);
             int row = (dy / cellSize).round().clamp(0, Board.SIZE - 1);
             onTap(row, col);
           },
           child: CustomPaint(
-            size: Size(size, size),
+            size: Size(boardDimension, boardDimension),
             painter: BoardPainter(
               board: board,
               winningLine: winningLine,
               showForbidden: showForbidden,
+              padding: padding,
+              boardSize: boardSize,
             ),
           ),
         );
@@ -48,35 +54,47 @@ class BoardPainter extends CustomPainter {
   final Board board;
   final List<List<int>> winningLine;
   final bool showForbidden;
+  final double padding;
+  final double boardSize;
 
   BoardPainter({
     required this.board,
     required this.winningLine,
     required this.showForbidden,
+    required this.padding,
+    required this.boardSize,
   });
 
   @override
   void paint(Canvas canvas, Size size) {
-    double cellSize = size.width / (Board.SIZE - 1);
+    double cellSize = boardSize / (Board.SIZE - 1);
+
+    Paint bgPaint = Paint()
+      ..color = const Color(0xFFDEB887);
+    canvas.drawRect(
+      Rect.fromLTWH(0, 0, size.width, size.height),
+      bgPaint,
+    );
 
     Paint linePaint = Paint()
       ..color = Colors.black
-      ..strokeWidth = 1.0;
+      ..strokeWidth = cellSize * 0.025;
 
     for (int i = 0; i < Board.SIZE; i++) {
       canvas.drawLine(
-        Offset(0, i * cellSize),
-        Offset(size.width, i * cellSize),
+        Offset(padding, padding + i * cellSize),
+        Offset(padding + boardSize, padding + i * cellSize),
         linePaint,
       );
       canvas.drawLine(
-        Offset(i * cellSize, 0),
-        Offset(i * cellSize, size.height),
+        Offset(padding + i * cellSize, padding),
+        Offset(padding + i * cellSize, padding + boardSize),
         linePaint,
       );
     }
 
     Paint starPaint = Paint()..color = Colors.black;
+    double starRadius = cellSize * 0.12;
     List<List<int>> starPoints = [
       [3, 3], [3, 7], [3, 11],
       [7, 3], [7, 7], [7, 11],
@@ -84,8 +102,8 @@ class BoardPainter extends CustomPainter {
     ];
     for (var point in starPoints) {
       canvas.drawCircle(
-        Offset(point[1] * cellSize, point[0] * cellSize),
-        4.0,
+        Offset(padding + point[1] * cellSize, padding + point[0] * cellSize),
+        starRadius,
         starPaint,
       );
     }
@@ -98,8 +116,8 @@ class BoardPainter extends CustomPainter {
         for (int j = 0; j < Board.SIZE; j++) {
           if (board.isEmpty(i, j) && ForbiddenMoves.isForbidden(board, i, j)) {
             canvas.drawCircle(
-              Offset(j * cellSize, i * cellSize),
-              cellSize * 0.3,
+              Offset(padding + j * cellSize, padding + i * cellSize),
+              cellSize * 0.25,
               forbiddenPaint,
             );
           }
@@ -124,8 +142,8 @@ class BoardPainter extends CustomPainter {
         ..color = board.getCell(row, col) == 1 ? Colors.white : Colors.black
         ..style = PaintingStyle.fill;
       canvas.drawCircle(
-        Offset(col * cellSize, row * cellSize),
-        4.0,
+        Offset(padding + col * cellSize, padding + row * cellSize),
+        cellSize * 0.1,
         lastMovePaint,
       );
     }
@@ -139,8 +157,8 @@ class BoardPainter extends CustomPainter {
     int player,
     bool isWinning,
   ) {
-    Offset center = Offset(col * cellSize, row * cellSize);
-    double radius = cellSize * 0.42;
+    Offset center = Offset(padding + col * cellSize, padding + row * cellSize);
+    double radius = cellSize * 0.45;
 
     Paint paint = Paint();
     if (player == 1) {
@@ -155,7 +173,7 @@ class BoardPainter extends CustomPainter {
     if (player == 2) {
       Paint borderPaint = Paint()
         ..color = Colors.black
-        ..strokeWidth = 1.5
+        ..strokeWidth = cellSize * 0.03
         ..style = PaintingStyle.stroke;
       canvas.drawCircle(center, radius, borderPaint);
     }
@@ -163,8 +181,8 @@ class BoardPainter extends CustomPainter {
     if (isWinning) {
       Paint winningPaint = Paint()
         ..color = Colors.red
-        ..strokeWidth = 3.0;
-      canvas.drawCircle(center, radius * 0.6, winningPaint);
+        ..strokeWidth = cellSize * 0.05;
+      canvas.drawCircle(center, radius * 0.5, winningPaint);
     }
   }
 

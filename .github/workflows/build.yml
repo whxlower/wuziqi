@@ -2,7 +2,9 @@ name: Build Android APK
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
   workflow_dispatch:
 
 jobs:
@@ -13,31 +15,33 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.22.x'
           channel: 'stable'
 
-      - name: Install dependencies
-        run: flutter pub get
-
-      - name: Create Flutter project structure
+      - name: Create Flutter project
         run: |
-          cd ..
-          flutter create gomoku_build
-          cd gomoku_build
-          rm -rf lib
-          cp -r ../gomoku/lib .
-          cp ../gomoku/pubspec.yaml .
-          cp -r ../gomoku/assets . 2>/dev/null || true
+          flutter create --org com.example gomoku_build
+          rm -rf gomoku_build/lib
+          cp -r lib gomoku_build/
+          cp pubspec.yaml gomoku_build/
 
       - name: Build APK
-        working-directory: ../gomoku_build
-        run: flutter build apk --release
+        run: |
+          cd gomoku_build
+          flutter pub get
+          flutter build apk --release
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: gomoku-apk
-          path: ../gomoku_build/build/app/outputs/flutter-apk/app-release.apk
+          path: gomoku_build/build/app/outputs/flutter-apk/app-release.apk

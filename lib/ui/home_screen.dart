@@ -382,6 +382,7 @@ class PlayerManagerScreen extends StatefulWidget {
 class _PlayerManagerScreenState extends State<PlayerManagerScreen> {
   late List<Player> _players;
   late String _currentPlayerId;
+  bool _isLoading = false;
 
   @override
   void initState() {
@@ -391,81 +392,128 @@ class _PlayerManagerScreenState extends State<PlayerManagerScreen> {
   }
 
   Future<void> _addPlayer() async {
-    TextEditingController controller = TextEditingController();
+    String? newName;
     await showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('添加玩家'),
-        content: TextField(
-          controller: controller,
-          decoration: const InputDecoration(hintText: '输入玩家名称'),
-          autofocus: true,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('取消'),
+      builder: (context) {
+        TextEditingController controller = TextEditingController();
+        return AlertDialog(
+          title: const Text('添加玩家'),
+          content: Container(
+            width: 300,
+            child: TextField(
+              controller: controller,
+              decoration: const InputDecoration(hintText: '输入玩家名称'),
+              autofocus: true,
+              onSubmitted: (value) {
+                if (value.trim().isNotEmpty) {
+                  newName = value.trim();
+                  Navigator.pop(context);
+                }
+              },
+            ),
           ),
-          ElevatedButton(
-            onPressed: () {
-              String name = controller.text.trim();
-              if (name.isNotEmpty) {
-                Navigator.pop(context);
-                _doAddPlayer(name);
-              }
-            },
-            child: const Text('确定'),
-          ),
-        ],
-      ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('取消'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                String name = controller.text.trim();
+                if (name.isNotEmpty) {
+                  newName = name;
+                  Navigator.pop(context);
+                }
+              },
+              child: const Text('确定'),
+            ),
+          ],
+        );
+      },
     );
+    if (newName != null && newName!.isNotEmpty) {
+      await _doAddPlayer(newName!);
+    }
   }
 
   Future<void> _doAddPlayer(String name) async {
-    await StorageManager.addPlayer(name);
-    await _refreshPlayers();
+    setState(() => _isLoading = true);
+    try {
+      await StorageManager.addPlayer(name);
+      await _refreshPlayers();
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('添加失败: $e')),
+      );
+    } finally {
+      setState(() => _isLoading = false);
+    }
   }
 
   Future<void> _deletePlayer(String playerId) async {
-    await showDialog(
+    bool? confirmed = await showDialog(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('确认删除'),
         content: const Text('删除后该玩家的历史记录也会被删除，确定继续？'),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(context, false),
             child: const Text('取消'),
           ),
           ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              _doDeletePlayer(playerId);
-            },
+            onPressed: () => Navigator.pop(context, true),
             child: const Text('删除'),
           ),
         ],
       ),
     );
+    if (confirmed == true) {
+      await _doDeletePlayer(playerId);
+    }
   }
 
   Future<void> _doDeletePlayer(String playerId) async {
-    await StorageManager.deletePlayer(playerId);
-    await _refreshPlayers();
+    setState(() => _isLoading = true);
+    try {
+      await StorageManager.deletePlayer(playerId);
+      await _refreshPlayers();
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('删除失败: $e')),
+      );
+    } finally {
+      setState(() => _isLoading = false);
+    }
   }
 
   Future<void> _selectPlayer(String playerId) async {
-    await StorageManager.setCurrentPlayerId(playerId);
-    setState(() {
-      _currentPlayerId = playerId;
-    });
-    widget.onChanged(_players.firstWhere((p) => p.id == playerId));
+    setState(() => _isLoading = true);
+    try {
+      await StorageManager.setCurrentPlayerId(playerId);
+      setState(() {
+        _currentPlayerId = playerId;
+      });
+      Player selected = _players.firstWhere((p) => p.id == playerId);
+      widget.onChanged(selected);
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('选择失败: $e')),
+      );
+    } finally {
+      setState(() => _isLoading = false);
+    }
   }
 
   Future<void> _refreshPlayers() async {
-    _players = await StorageManager.getPlayers();
-    _currentPlayerId = await StorageManager.getCurrentPlayerId();
-    setState(() {});
+    try {
+      _players = await StorageManager.getPlayers();
+      _currentPlayerId = await StorageManager.getCurrentPlayerId();
+      setState(() {});
+    } catch (e) {
+      print('Failed to refresh players: $e');
+    }
   }
 
   @override
@@ -475,54 +523,55 @@ class _PlayerManagerScreenState extends State<PlayerManagerScreen> {
         title: const Text('玩家管理'),
         centerTitle: true,
       ),
-      body: ListView.builder(
-        padding: const EdgeInsets.all(16),
-        itemCount: _players.length + 1,
-        itemBuilder: (context, index) {
-          if (index == _players.length) {
-            return Padding(
-              padding: const EdgeInsets.only(top: 10),
-              child: ElevatedButton.icon(
-                onPressed: _addPlayer,
-                icon: const Icon(Icons.add),
-                label: const Text('添加玩家'),
-              ),
-            );
-          }
-          Player player = _players[index];
-          bool isCurrent = player.id == _currentPlayerId;
-          return Card(
-            child: ListTile(
-              leading: CircleAvatar(
-                backgroundColor: Colors.brown,
-                child: Text(
-                  player.name[0],
-                  style: const TextStyle(color: Colors.white),
-                ),
-              ),
-              title: Text(player.name),
-              subtitle: Text('胜${player.wins} 负${player.losses} 平${player.draws}'),
-              trailing: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (!isCurrent)
-                    TextButton(
-                      onPressed: () => _selectPlayer(player.id),
-                      child: const Text('选择'),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : ListView.builder(
+              padding: const EdgeInsets.all(16),
+              itemCount: _players.length + 1,
+              itemBuilder: (context, index) {
+                if (index == _players.length) {
+                  return Padding(
+                    padding: const EdgeInsets.only(top: 10),
+                    child: ElevatedButton.icon(
+                      onPressed: _addPlayer,
+                      icon: const Icon(Icons.add),
+                      label: const Text('添加玩家'),
                     ),
-                  if (isCurrent)
-                    const Icon(Icons.check, color: Colors.green),
-                  if (_players.length > 1)
-                    IconButton(
-                      onPressed: () => _deletePlayer(player.id),
-                      icon: const Icon(Icons.delete, color: Colors.red),
+                  );
+                }
+                Player player = _players[index];
+                bool isCurrent = player.id == _currentPlayerId;
+                return Card(
+                  child: ListTile(
+                    leading: CircleAvatar(
+                      backgroundColor: Colors.brown,
+                      child: Text(
+                        player.name.isNotEmpty ? player.name[0] : '?',
+                        style: const TextStyle(color: Colors.white),
+                      ),
                     ),
-                ],
-              ),
+                    title: Text(player.name),
+                    subtitle: Text('胜${player.wins} 负${player.losses} 平${player.draws}'),
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (!isCurrent)
+                          TextButton(
+                            onPressed: () => _selectPlayer(player.id),
+                            child: const Text('选择'),
+                          ),
+                        if (isCurrent)
+                          const Icon(Icons.check, color: Colors.green),
+                        IconButton(
+                          onPressed: () => _deletePlayer(player.id),
+                          icon: const Icon(Icons.delete, color: Colors.red),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
             ),
-          );
-        },
-      ),
     );
   }
 }

@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class Player {
@@ -43,8 +44,8 @@ class Player {
 
   factory Player.fromJson(Map<String, dynamic> json) {
     return Player(
-      id: json['id'],
-      name: json['name'],
+      id: json['id'] ?? '',
+      name: json['name'] ?? '',
       wins: json['wins'] ?? 0,
       losses: json['losses'] ?? 0,
       draws: json['draws'] ?? 0,
@@ -94,14 +95,14 @@ class GameRecord {
 
   factory GameRecord.fromJson(Map<String, dynamic> json) {
     return GameRecord(
-      id: json['id'],
-      playerId: json['playerId'],
-      playerName: json['playerName'],
-      aiDifficulty: json['aiDifficulty'],
-      playerColor: json['playerColor'],
-      result: json['result'],
-      duration: json['duration'],
-      date: DateTime.parse(json['date']),
+      id: json['id'] ?? '',
+      playerId: json['playerId'] ?? '',
+      playerName: json['playerName'] ?? '',
+      aiDifficulty: json['aiDifficulty'] ?? '',
+      playerColor: json['playerColor'] ?? 1,
+      result: json['result'] ?? '',
+      duration: json['duration'] ?? 0,
+      date: DateTime.tryParse(json['date'] ?? '') ?? DateTime.now(),
     );
   }
 }
@@ -116,80 +117,110 @@ class StorageManager {
   }
 
   static Future<List<Player>> getPlayers() async {
-    final prefs = await _getPrefs();
-    final jsonString = prefs.getString(_playersKey);
-    if (jsonString == null) {
+    try {
+      final prefs = await _getPrefs();
+      final jsonString = prefs.getString(_playersKey);
+      if (jsonString == null || jsonString.isEmpty) {
+        return [Player(id: '1', name: '玩家', wins: 0, losses: 0, draws: 0)];
+      }
+      final List<dynamic> jsonList = json.decode(jsonString);
+      return jsonList.map((e) => Player.fromJson(e)).toList();
+    } catch (e) {
       return [Player(id: '1', name: '玩家', wins: 0, losses: 0, draws: 0)];
     }
-    final List<dynamic> jsonList = await Future.microtask(() =>
-        _decodeJson(jsonString));
-    return jsonList.map((e) => Player.fromJson(e)).toList();
   }
 
   static Future<void> savePlayers(List<Player> players) async {
-    final prefs = await _getPrefs();
-    final jsonString = _encodeJson(players.map((p) => p.toJson()).toList());
-    await prefs.setString(_playersKey, jsonString);
+    try {
+      final prefs = await _getPrefs();
+      final jsonString = json.encode(players.map((p) => p.toJson()).toList());
+      await prefs.setString(_playersKey, jsonString);
+    } catch (e) {
+      print('Failed to save players: $e');
+    }
   }
 
   static Future<void> addPlayer(String name) async {
-    final players = await getPlayers();
-    final newPlayer = Player(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
-      name: name,
-    );
-    players.add(newPlayer);
-    await savePlayers(players);
+    try {
+      final players = await getPlayers();
+      final newPlayer = Player(
+        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        name: name,
+      );
+      players.add(newPlayer);
+      await savePlayers(players);
+    } catch (e) {
+      print('Failed to add player: $e');
+    }
   }
 
   static Future<void> deletePlayer(String playerId) async {
-    final players = await getPlayers();
-    players.removeWhere((p) => p.id == playerId);
-    if (players.isEmpty) {
-      players.add(Player(id: '1', name: '玩家'));
+    try {
+      final players = await getPlayers();
+      players.removeWhere((p) => p.id == playerId);
+      if (players.isEmpty) {
+        players.add(Player(id: '1', name: '玩家'));
+      }
+      await savePlayers(players);
+      final currentPlayerId = await getCurrentPlayerId();
+      if (currentPlayerId == playerId) {
+        await setCurrentPlayerId(players.first.id);
+      }
+      final records = await getRecords();
+      final filtered = records.where((r) => r.playerId != playerId).toList();
+      await saveRecords(filtered);
+    } catch (e) {
+      print('Failed to delete player: $e');
     }
-    await savePlayers(players);
-    final currentPlayerId = await getCurrentPlayerId();
-    if (currentPlayerId == playerId) {
-      await setCurrentPlayerId(players.first.id);
-    }
-    final records = await getRecords();
-    final filtered = records.where((r) => r.playerId != playerId).toList();
-    await saveRecords(filtered);
   }
 
   static Future<void> updatePlayer(Player player) async {
-    final players = await getPlayers();
-    final index = players.indexWhere((p) => p.id == player.id);
-    if (index != -1) {
-      players[index] = player;
-      await savePlayers(players);
+    try {
+      final players = await getPlayers();
+      final index = players.indexWhere((p) => p.id == player.id);
+      if (index != -1) {
+        players[index] = player;
+        await savePlayers(players);
+      }
+    } catch (e) {
+      print('Failed to update player: $e');
     }
   }
 
   static Future<String> getCurrentPlayerId() async {
-    final prefs = await _getPrefs();
-    final players = await getPlayers();
-    final id = prefs.getString(_currentPlayerKey);
-    if (id != null && players.any((p) => p.id == id)) {
-      return id;
+    try {
+      final prefs = await _getPrefs();
+      final players = await getPlayers();
+      final id = prefs.getString(_currentPlayerKey);
+      if (id != null && players.any((p) => p.id == id)) {
+        return id;
+      }
+      return players.first.id;
+    } catch (e) {
+      return '1';
     }
-    return players.first.id;
   }
 
   static Future<void> setCurrentPlayerId(String playerId) async {
-    final prefs = await _getPrefs();
-    await prefs.setString(_currentPlayerKey, playerId);
+    try {
+      final prefs = await _getPrefs();
+      await prefs.setString(_currentPlayerKey, playerId);
+    } catch (e) {
+      print('Failed to set current player: $e');
+    }
   }
 
   static Future<List<GameRecord>> getRecords() async {
-    final prefs = await _getPrefs();
-    final jsonString = prefs.getString(_recordsKey);
-    if (jsonString == null) return [];
-    final List<dynamic> jsonList = await Future.microtask(() =>
-        _decodeJson(jsonString));
-    return jsonList.map((e) => GameRecord.fromJson(e)).toList()
-      ..sort((a, b) => b.date.compareTo(a.date));
+    try {
+      final prefs = await _getPrefs();
+      final jsonString = prefs.getString(_recordsKey);
+      if (jsonString == null || jsonString.isEmpty) return [];
+      final List<dynamic> jsonList = json.decode(jsonString);
+      return jsonList.map((e) => GameRecord.fromJson(e)).toList()
+        ..sort((a, b) => b.date.compareTo(a.date));
+    } catch (e) {
+      return [];
+    }
   }
 
   static Future<List<GameRecord>> getRecordsByPlayer(String playerId) async {
@@ -198,167 +229,65 @@ class StorageManager {
   }
 
   static Future<void> saveRecords(List<GameRecord> records) async {
-    final prefs = await _getPrefs();
-    final jsonString = _encodeJson(records.map((r) => r.toJson()).toList());
-    await prefs.setString(_recordsKey, jsonString);
+    try {
+      final prefs = await _getPrefs();
+      final jsonString = json.encode(records.map((r) => r.toJson()).toList());
+      await prefs.setString(_recordsKey, jsonString);
+    } catch (e) {
+      print('Failed to save records: $e');
+    }
   }
 
   static Future<void> addRecord(GameRecord record) async {
-    final records = await getRecords();
-    records.insert(0, record);
-    if (records.length > 100) {
-      records.removeRange(100, records.length);
+    try {
+      final records = await getRecords();
+      records.insert(0, record);
+      if (records.length > 100) {
+        records.removeRange(100, records.length);
+      }
+      await saveRecords(records);
+      await updatePlayerStats(record);
+    } catch (e) {
+      print('Failed to add record: $e');
     }
-    await saveRecords(records);
-    await updatePlayerStats(record);
   }
 
   static Future<void> clearRecords() async {
-    final prefs = await _getPrefs();
-    await prefs.remove(_recordsKey);
-    final players = await getPlayers();
-    for (var player in players) {
-      await updatePlayer(player.copyWith(wins: 0, losses: 0, draws: 0));
+    try {
+      final prefs = await _getPrefs();
+      await prefs.remove(_recordsKey);
+      final players = await getPlayers();
+      for (var player in players) {
+        await updatePlayer(player.copyWith(wins: 0, losses: 0, draws: 0));
+      }
+    } catch (e) {
+      print('Failed to clear records: $e');
     }
   }
 
   static Future<void> updatePlayerStats(GameRecord record) async {
-    final players = await getPlayers();
-    final index = players.indexWhere((p) => p.id == record.playerId);
-    if (index != -1) {
-      final player = players[index];
-      Player updated;
-      switch (record.result) {
-        case 'win':
-          updated = player.copyWith(wins: player.wins + 1);
-          break;
-        case 'loss':
-          updated = player.copyWith(losses: player.losses + 1);
-          break;
-        default:
-          updated = player.copyWith(draws: player.draws + 1);
-          break;
-      }
-      players[index] = updated;
-      await savePlayers(players);
-    }
-  }
-
-  static dynamic _decodeJson(String jsonString) {
     try {
-      return _parseJson(jsonString);
-    } catch (_) {
-      return [];
-    }
-  }
-
-  static String _encodeJson(dynamic value) {
-    try {
-      return _stringifyJson(value);
-    } catch (_) {
-      return '[]';
-    }
-  }
-
-  static dynamic _parseJson(String source) {
-    const int maxDepth = 100;
-    int depth = 0;
-    List<dynamic> stack = [];
-    String currentString = '';
-    bool inString = false;
-    String? escapeChar;
-
-    for (int i = 0; i < source.length; i++) {
-      final char = source[i];
-
-      if (escapeChar != null) {
-        currentString += char;
-        escapeChar = null;
-        continue;
-      }
-
-      if (char == '\\' && inString) {
-        escapeChar = '\\';
-        continue;
-      }
-
-      if (char == '"') {
-        inString = !inString;
-        continue;
-      }
-
-      if (!inString) {
-        if (char == '[' || char == '{') {
-          depth++;
-          if (depth > maxDepth) return [];
-          stack.add(char == '[' ? [] : {});
-          continue;
+      final players = await getPlayers();
+      final index = players.indexWhere((p) => p.id == record.playerId);
+      if (index != -1) {
+        final player = players[index];
+        Player updated;
+        switch (record.result) {
+          case 'win':
+            updated = player.copyWith(wins: player.wins + 1);
+            break;
+          case 'loss':
+            updated = player.copyWith(losses: player.losses + 1);
+            break;
+          default:
+            updated = player.copyWith(draws: player.draws + 1);
+            break;
         }
-
-        if (char == ']' || char == '}') {
-          depth--;
-          final current = stack.removeLast();
-          if (stack.isEmpty) return current;
-          final parent = stack.last;
-          if (parent is List) {
-            parent.add(current is String && currentString.isNotEmpty ? currentString : current);
-          } else if (parent is Map) {
-            parent[currentString] = current;
-          }
-          currentString = '';
-          continue;
-        }
-
-        if (char == ':') {
-          continue;
-        }
-
-        if (char == ',') {
-          if (stack.last is List) {
-            (stack.last as List).add(_parseValue(currentString));
-          }
-          currentString = '';
-          continue;
-        }
+        players[index] = updated;
+        await savePlayers(players);
       }
-
-      currentString += char;
+    } catch (e) {
+      print('Failed to update player stats: $e');
     }
-
-    return stack.isEmpty ? _parseValue(currentString) : stack.last;
-  }
-
-  static dynamic _parseValue(String value) {
-    value = value.trim();
-    if (value == 'null') return null;
-    if (value == 'true') return true;
-    if (value == 'false') return false;
-    if (value.startsWith('"') && value.endsWith('"')) {
-      return value.substring(1, value.length - 1);
-    }
-    final numValue = num.tryParse(value);
-    if (numValue != null) return numValue;
-    return value;
-  }
-
-  static String _stringifyJson(dynamic value) {
-    if (value == null) return 'null';
-    if (value is bool) return value ? 'true' : 'false';
-    if (value is num) return value.toString();
-    if (value is String) {
-      String escaped = value
-          .replaceAll('\\', '\\\\')
-          .replaceAll('"', '\\"')
-          .replaceAll('\n', '\\n')
-          .replaceAll('\r', '\\r');
-      return '"$escaped"';
-    }
-    if (value is List) {
-      return '[${value.map(_stringifyJson).join(',')}]';
-    }
-    if (value is Map) {
-      return '{${value.entries.map((e) => '"${e.key}":${_stringifyJson(e.value)}').join(',')}}';
-    }
-    return 'null';
   }
 }

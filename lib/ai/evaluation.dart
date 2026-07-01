@@ -3,12 +3,12 @@ import '../logic/rules.dart';
 import '../logic/forbidden_moves.dart';
 
 class Evaluation {
-  static const int WIN_SCORE = 100000;
-  static const int FOUR_SCORE = 10000;
-  static const int OPEN_THREE_SCORE = 1000;
-  static const int THREE_SCORE = 500;
-  static const int OPEN_TWO_SCORE = 100;
-  static const int TWO_SCORE = 50;
+  static const int WIN_SCORE = 1000000;
+  static const int FOUR_SCORE = 100000;
+  static const int OPEN_THREE_SCORE = 10000;
+  static const int THREE_SCORE = 5000;
+  static const int OPEN_TWO_SCORE = 1000;
+  static const int TWO_SCORE = 500;
   static const int CENTER_BONUS = 10;
 
   static int evaluate(Board board, int player) {
@@ -32,6 +32,65 @@ class Evaluation {
         }
       }
     }
+
+    return score;
+  }
+
+  static int evaluateMove(Board board, int row, int col, int player) {
+    if (!board.isEmpty(row, col)) return -1000000;
+
+    Board testBoard = board.clone();
+    testBoard.placeStone(row, col);
+
+    int score = 0;
+
+    for (var dir in Rules.DIRECTIONS) {
+      int count = 0;
+      int empty = 0;
+
+      for (int i = -4; i <= 4; i++) {
+        int r = row + dir[0] * i;
+        int c = col + dir[1] * i;
+        if (r >= 0 && r < Board.SIZE && c >= 0 && c < Board.SIZE) {
+          int cell = testBoard.getCell(r, c);
+          if (cell == player) count++;
+          else if (cell == 0) empty++;
+          else break;
+        }
+      }
+
+      if (count >= 5) return WIN_SCORE;
+      if (count == 4 && empty >= 1) score += FOUR_SCORE;
+      else if (count == 4) score += FOUR_SCORE ~/ 2;
+      else if (count == 3 && empty >= 2) score += OPEN_THREE_SCORE;
+      else if (count == 3 && empty >= 1) score += THREE_SCORE;
+      else if (count == 2 && empty >= 2) score += OPEN_TWO_SCORE;
+      else if (count == 2 && empty >= 1) score += TWO_SCORE;
+    }
+
+    int opponent = player == 1 ? 2 : 1;
+    for (var dir in Rules.DIRECTIONS) {
+      int count = 0;
+      int empty = 0;
+
+      for (int i = -4; i <= 4; i++) {
+        int r = row + dir[0] * i;
+        int c = col + dir[1] * i;
+        if (r >= 0 && r < Board.SIZE && c >= 0 && c < Board.SIZE) {
+          int cell = board.getCell(r, c);
+          if (cell == opponent) count++;
+          else if (cell == 0) empty++;
+          else break;
+        }
+      }
+
+      if (count == 4 && empty >= 1) score += FOUR_SCORE;
+      else if (count == 4) score += FOUR_SCORE ~/ 2;
+      else if (count == 3 && empty >= 2) score += OPEN_THREE_SCORE;
+      else if (count == 3 && empty >= 1) score += THREE_SCORE;
+    }
+
+    score += _getCenterBonus(row, col);
 
     return score;
   }
@@ -153,16 +212,6 @@ class Evaluation {
       int col = int.parse(parts[1]);
       if (!ForbiddenMoves.isForbidden(board, row, col)) {
         candidates.add([row, col]);
-      }
-    }
-
-    if (candidates.isEmpty) {
-      for (int i = 0; i < Board.SIZE; i++) {
-        for (int j = 0; j < Board.SIZE; j++) {
-          if (board.isEmpty(i, j)) {
-            candidates.add([i, j]);
-          }
-        }
       }
     }
 

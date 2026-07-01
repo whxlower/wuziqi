@@ -26,7 +26,7 @@ class AIEngine {
       case Difficulty.medium:
         return 3;
       case Difficulty.hard:
-        return 5;
+        return 4;
     }
   }
 
@@ -38,8 +38,49 @@ class AIEngine {
       'aiPlayer': aiPlayer,
     };
 
-    final result = await Isolate.run(() => _minimaxAsync(args));
-    return result;
+    try {
+      final result = await Isolate.run(() => _minimaxAsync(args)).timeout(
+        const Duration(seconds: 8),
+        onTimeout: () => [-1, -1, 0],
+      );
+      if (result[0] == -1) {
+        return _getFallbackMove(board);
+      }
+      return result;
+    } catch (_) {
+      return _getFallbackMove(board);
+    }
+  }
+
+  List<int> _getFallbackMove(Board board) {
+    List<List<int>> candidates = Evaluation.getCandidates(board);
+    if (candidates.isEmpty) return [-1, -1];
+
+    candidates.removeWhere((m) => ForbiddenMoves.isForbidden(board, m[0], m[1]));
+
+    if (candidates.isEmpty) {
+      for (int i = 0; i < Board.SIZE; i++) {
+        for (int j = 0; j < Board.SIZE; j++) {
+          if (board.isEmpty(i, j)) {
+            return [i, j];
+          }
+        }
+      }
+      return [-1, -1];
+    }
+
+    int bestScore = -1000000;
+    List<int> bestMove = candidates[0];
+
+    for (var move in candidates) {
+      int score = Evaluation.evaluateMove(board, move[0], move[1], aiPlayer);
+      if (score > bestScore) {
+        bestScore = score;
+        bestMove = move;
+      }
+    }
+
+    return [bestMove[0], bestMove[1], bestScore];
   }
 
   static List<int> _minimaxAsync(Map<String, dynamic> args) {
@@ -68,10 +109,14 @@ class AIEngine {
     }
 
     candidates.sort((a, b) {
-      int scoreA = _quickScore(board, a[0], a[1], player);
-      int scoreB = _quickScore(board, b[0], b[1], player);
+      int scoreA = Evaluation.evaluateMove(board, a[0], a[1], player);
+      int scoreB = Evaluation.evaluateMove(board, b[0], b[1], player);
       return scoreB - scoreA;
     });
+
+    if (candidates.length > 10) {
+      candidates = candidates.take(10).toList();
+    }
 
     List<int> bestMove = candidates[0];
     int bestScore = player == 1 ? -1000000 : 1000000;
@@ -106,35 +151,5 @@ class AIEngine {
     }
 
     return [...bestMove, bestScore];
-  }
-
-  static int _quickScore(Board board, int row, int col, int player) {
-    int score = 0;
-    int centerBonus = 15 - (row - 7).abs() - (col - 7).abs();
-    score += centerBonus * 5;
-
-    for (var dir in Rules.DIRECTIONS) {
-      int count = 0;
-      int empty = 0;
-
-      for (int i = -4; i <= 4; i++) {
-        int r = row + dir[0] * i;
-        int c = col + dir[1] * i;
-        if (r >= 0 && r < Board.SIZE && c >= 0 && c < Board.SIZE) {
-          int cell = board.getCell(r, c);
-          if (cell == player) count++;
-          else if (cell == 0) empty++;
-          else break;
-        }
-      }
-
-      if (count >= 4) return 100000;
-      if (count == 3 && empty >= 2) score += 1000;
-      else if (count == 3 && empty >= 1) score += 500;
-      else if (count == 2 && empty >= 2) score += 200;
-      else if (count == 2 && empty >= 1) score += 100;
-    }
-
-    return score;
   }
 }

@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'dart:isolate';
 import '../logic/board.dart';
 import '../logic/rules.dart';
 import '../logic/forbidden_moves.dart';
@@ -21,21 +23,34 @@ class AIEngine {
   int _getDepth() {
     switch (difficulty) {
       case Difficulty.easy:
-        return 3;
+        return 2;
       case Difficulty.medium:
-        return 4;
+        return 3;
       case Difficulty.hard:
-        return 6;
+        return 4;
     }
   }
 
   Future<List<int>> getBestMove(Board board) async {
-    return Future.delayed(const Duration(milliseconds: 100), () {
-      return _minimax(board, _getDepth(), -1000000, 1000000, aiPlayer);
-    });
+    int depth = _getDepth();
+    Map<String, dynamic> args = {
+      'board': board.toJson(),
+      'depth': depth,
+      'aiPlayer': aiPlayer,
+    };
+
+    final result = await Isolate.run(() => _minimaxAsync(args));
+    return result;
   }
 
-  List<int> _minimax(
+  static List<int> _minimaxAsync(Map<String, dynamic> args) {
+    Board board = Board.fromJson(args['board']);
+    int depth = args['depth'];
+    int aiPlayer = args['aiPlayer'];
+    return _minimax(board, depth, -1000000, 1000000, aiPlayer);
+  }
+
+  static List<int> _minimax(
     Board board,
     int depth,
     int alpha,
@@ -44,7 +59,7 @@ class AIEngine {
   ) {
     int winner = Rules.checkWin(board);
     if (depth == 0 || winner != 0) {
-      int score = Evaluation.evaluate(board, aiPlayer);
+      int score = Evaluation.evaluate(board, player);
       return [-1, -1, score];
     }
 
@@ -54,7 +69,7 @@ class AIEngine {
     }
 
     List<int> bestMove = candidates[0];
-    int bestScore = player == aiPlayer ? -1000000 : 1000000;
+    int bestScore = player == 1 ? -1000000 : 1000000;
 
     for (var move in candidates) {
       if (ForbiddenMoves.isForbidden(board, move[0], move[1])) {
@@ -66,7 +81,7 @@ class AIEngine {
 
       List<int> result = _minimax(newBoard, depth - 1, alpha, beta, player == 1 ? 2 : 1);
 
-      if (player == aiPlayer) {
+      if (player == 1) {
         if (result[2] > bestScore) {
           bestScore = result[2];
           bestMove = move;

@@ -261,11 +261,16 @@ class _GameScreenState extends State<GameScreen> {
               ],
             ),
           ),
-          if (isAIMoving)
-            const Padding(
+          Visibility(
+            visible: isAIMoving,
+            maintainSize: true,
+            maintainAnimation: true,
+            maintainState: true,
+            child: const Padding(
               padding: EdgeInsets.only(bottom: 16),
               child: CircularProgressIndicator(),
             ),
+          ),
         ],
       ),
     );

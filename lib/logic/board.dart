@@ -93,4 +93,22 @@ class Board {
     }
     return true;
   }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'grid': _grid,
+      'currentPlayer': _currentPlayer,
+      'lastMove': _lastMove,
+      'history': _history,
+    };
+  }
+
+  factory Board.fromJson(Map<String, dynamic> json) {
+    return Board.fromState(
+      List<List<int>>.from(json['grid'].map((row) => List<int>.from(row))),
+      json['currentPlayer'],
+      List<int>.from(json['lastMove']),
+      List<List<int>>.from(json['history'].map((h) => List<int>.from(h))),
+    );
+  }
 }

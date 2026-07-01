@@ -3,17 +3,22 @@ import '../logic/board.dart';
 import '../logic/rules.dart';
 import '../logic/forbidden_moves.dart';
 import '../ai/ai_engine.dart';
+import '../data/storage.dart';
 import 'board_widget.dart';
 import 'home_screen.dart';
 
 class GameScreen extends StatefulWidget {
   final GameMode gameMode;
   final int playerColor;
+  final Player? player;
+  final Difficulty? difficulty;
 
   const GameScreen({
     super.key,
     required this.gameMode,
     this.playerColor = 1,
+    this.player,
+    this.difficulty,
   });
 
   @override
@@ -27,16 +32,19 @@ class _GameScreenState extends State<GameScreen> {
   String result = '';
   bool isAIMoving = false;
   bool showForbidden = false;
+  DateTime gameStartTime = DateTime.now();
 
   @override
   void initState() {
     super.initState();
     board = Board();
     int aiPlayer = widget.playerColor == 1 ? 2 : 1;
+    Difficulty diff = widget.difficulty ?? Difficulty.medium;
     aiEngine = AIEngine(
-      difficulty: Difficulty.medium,
+      difficulty: diff,
       aiPlayer: aiPlayer,
     );
+    gameStartTime = DateTime.now();
 
     if (widget.gameMode == GameMode.pve && widget.playerColor == 2) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -106,8 +114,36 @@ class _GameScreenState extends State<GameScreen> {
           }
         }
       });
+      _saveRecord(winner);
       _showResultDialog();
     }
+  }
+
+  Future<void> _saveRecord(int winner) async {
+    if (widget.gameMode != GameMode.pve || widget.player == null) return;
+
+    int duration = DateTime.now().difference(gameStartTime).inSeconds;
+    String resultStr;
+    if (winner == -1) {
+      resultStr = 'draw';
+    } else if (winner == widget.playerColor) {
+      resultStr = 'win';
+    } else {
+      resultStr = 'loss';
+    }
+
+    GameRecord record = GameRecord(
+      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      playerId: widget.player!.id,
+      playerName: widget.player!.name,
+      aiDifficulty: widget.difficulty?.name ?? 'medium',
+      playerColor: widget.playerColor,
+      result: resultStr,
+      duration: duration,
+      date: DateTime.now(),
+    );
+
+    await StorageManager.addRecord(record);
   }
 
   void _showForbiddenWarning(String type) {
@@ -140,6 +176,7 @@ class _GameScreenState extends State<GameScreen> {
                 board.reset();
                 winningLine = [];
                 result = '';
+                gameStartTime = DateTime.now();
                 if (widget.gameMode == GameMode.pve && widget.playerColor == 2) {
                   _aiMove();
                 }
@@ -176,6 +213,7 @@ class _GameScreenState extends State<GameScreen> {
       board.reset();
       winningLine = [];
       result = '';
+      gameStartTime = DateTime.now();
       if (widget.gameMode == GameMode.pve && widget.playerColor == 2) {
         _aiMove();
       }
@@ -233,7 +271,7 @@ class _GameScreenState extends State<GameScreen> {
       body: LayoutBuilder(
         builder: (context, constraints) {
           bool isLandscape = constraints.maxWidth > constraints.maxHeight;
-          
+
           if (isLandscape) {
             return Row(
               children: [

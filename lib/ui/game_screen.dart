@@ -182,6 +182,41 @@ class _GameScreenState extends State<GameScreen> {
     });
   }
 
+  Widget _buildButtonBar() {
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        IconButton(
+          icon: const Icon(Icons.undo, size: 28),
+          onPressed: _undo,
+          tooltip: '悔棋',
+        ),
+        const SizedBox(height: 16),
+        IconButton(
+          icon: const Icon(Icons.refresh, size: 28),
+          onPressed: _reset,
+          tooltip: '重新开始',
+        ),
+        if (widget.gameMode == GameMode.pve) ...[
+          const SizedBox(height: 16),
+          IconButton(
+            icon: Icon(
+              showForbidden ? Icons.block : Icons.block_outlined,
+              size: 28,
+              color: showForbidden ? Colors.red : null,
+            ),
+            onPressed: () {
+              setState(() {
+                showForbidden = !showForbidden;
+              });
+            },
+            tooltip: showForbidden ? '隐藏禁手' : '显示禁手',
+          ),
+        ],
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -195,83 +230,158 @@ class _GameScreenState extends State<GameScreen> {
           onPressed: () => Navigator.pop(context),
         ),
       ),
-      body: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          bool isLandscape = constraints.maxWidth > constraints.maxHeight;
+          
+          if (isLandscape) {
+            return Row(
               children: [
-                const Text('当前玩家：'),
-                const SizedBox(width: 10),
+                Expanded(
+                  flex: 5,
+                  child: Column(
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Text('当前玩家：'),
+                            const SizedBox(width: 8),
+                            Container(
+                              width: 20,
+                              height: 20,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: board.currentPlayer == 1 ? Colors.black : Colors.white,
+                                border: board.currentPlayer == 2
+                                    ? Border.all(color: Colors.black, width: 2)
+                                    : null,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Text(board.currentPlayer == 1 ? '黑棋' : '白棋'),
+                          ],
+                        ),
+                      ),
+                      Expanded(
+                        child: Padding(
+                          padding: const EdgeInsets.all(4),
+                          child: BoardWidget(
+                            board: board,
+                            winningLine: winningLine,
+                            showForbidden: showForbidden,
+                            onTap: _handleTap,
+                          ),
+                        ),
+                      ),
+                      Visibility(
+                        visible: isAIMoving,
+                        maintainSize: true,
+                        maintainAnimation: true,
+                        maintainState: true,
+                        child: const Padding(
+                          padding: EdgeInsets.only(bottom: 8),
+                          child: CircularProgressIndicator(),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
                 Container(
-                  width: 24,
-                  height: 24,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: board.currentPlayer == 1 ? Colors.black : Colors.white,
-                    border: board.currentPlayer == 2
-                        ? Border.all(color: Colors.black, width: 2)
-                        : null,
-                  ),
+                  width: 60,
+                  color: Colors.grey[100],
+                  child: _buildButtonBar(),
                 ),
-                const SizedBox(width: 10),
-                Text(board.currentPlayer == 1 ? '黑棋' : '白棋'),
               ],
-            ),
-          ),
-          Expanded(
-            child: Center(
-              child: Padding(
-                padding: const EdgeInsets.all(8),
-                child: BoardWidget(
-                  board: board,
-                  winningLine: winningLine,
-                  showForbidden: showForbidden,
-                  onTap: _handleTap,
-                ),
-              ),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
+            );
+          } else {
+            return Column(
               children: [
-                ElevatedButton(
-                  onPressed: _undo,
-                  child: const Text('悔棋'),
-                ),
-                const SizedBox(width: 20),
-                ElevatedButton(
-                  onPressed: _reset,
-                  child: const Text('重新开始'),
-                ),
-                if (widget.gameMode == GameMode.pve) ...[
-                  const SizedBox(width: 20),
-                  ElevatedButton(
-                    onPressed: () {
-                      setState(() {
-                        showForbidden = !showForbidden;
-                      });
-                    },
-                    child: Text(showForbidden ? '隐藏禁手' : '显示禁手'),
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Text('当前玩家：'),
+                      const SizedBox(width: 8),
+                      Container(
+                        width: 20,
+                        height: 20,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: board.currentPlayer == 1 ? Colors.black : Colors.white,
+                          border: board.currentPlayer == 2
+                              ? Border.all(color: Colors.black, width: 2)
+                              : null,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(board.currentPlayer == 1 ? '黑棋' : '白棋'),
+                    ],
                   ),
-                ],
+                ),
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.all(4),
+                    child: BoardWidget(
+                      board: board,
+                      winningLine: winningLine,
+                      showForbidden: showForbidden,
+                      onTap: _handleTap,
+                    ),
+                  ),
+                ),
+                Container(
+                  height: 60,
+                  color: Colors.grey[100],
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.undo, size: 28),
+                        onPressed: _undo,
+                        tooltip: '悔棋',
+                      ),
+                      const SizedBox(width: 20),
+                      IconButton(
+                        icon: const Icon(Icons.refresh, size: 28),
+                        onPressed: _reset,
+                        tooltip: '重新开始',
+                      ),
+                      if (widget.gameMode == GameMode.pve) ...[
+                        const SizedBox(width: 20),
+                        IconButton(
+                          icon: Icon(
+                            showForbidden ? Icons.block : Icons.block_outlined,
+                            size: 28,
+                            color: showForbidden ? Colors.red : null,
+                          ),
+                          onPressed: () {
+                            setState(() {
+                              showForbidden = !showForbidden;
+                            });
+                          },
+                          tooltip: showForbidden ? '隐藏禁手' : '显示禁手',
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                Visibility(
+                  visible: isAIMoving,
+                  maintainSize: true,
+                  maintainAnimation: true,
+                  maintainState: true,
+                  child: const Padding(
+                    padding: EdgeInsets.only(bottom: 8),
+                    child: CircularProgressIndicator(),
+                  ),
+                ),
               ],
-            ),
-          ),
-          Visibility(
-            visible: isAIMoving,
-            maintainSize: true,
-            maintainAnimation: true,
-            maintainState: true,
-            child: const Padding(
-              padding: EdgeInsets.only(bottom: 16),
-              child: CircularProgressIndicator(),
-            ),
-          ),
-        ],
+            );
+          }
+        },
       ),
     );
   }

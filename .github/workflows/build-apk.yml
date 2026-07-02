@@ -66,6 +66,11 @@ jobs:
           yes | "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" \
             "build-tools;33.0.2" "platform-tools" "platforms;android-33" || true
 
+          # 兼容旧版 Buildozer：创建 tools/bin/sdkmanager 软链接
+          mkdir -p "$ANDROID_SDK_ROOT/tools/bin"
+          ln -sf "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" "$ANDROID_SDK_ROOT/tools/bin/sdkmanager"
+          ln -sf "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/avdmanager" "$ANDROID_SDK_ROOT/tools/bin/avdmanager"
+
       - name: Build APK
         working-directory: gomoku
         run: |

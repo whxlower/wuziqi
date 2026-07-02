@@ -77,7 +77,7 @@ class Evaluation {
             if (evaluatedPositions.contains(key)) continue;
             evaluatedPositions.add(key);
 
-            PatternResult result = analyzePattern(testBoard, i, j, dir, player);
+            PatternResult result = analyzePattern(board, i, j, dir, player);
             patternCounts[result.type] = (patternCounts[result.type] ?? 0) + 1;
           }
         }

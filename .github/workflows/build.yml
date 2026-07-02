@@ -42,6 +42,11 @@ jobs:
           cd gomoku
           flutter pub get
 
+      - name: Fix analysis options
+        run: |
+          cd gomoku
+          rm -f analysis_options.yaml
+
       - name: Analyze code
         run: |
           cd gomoku

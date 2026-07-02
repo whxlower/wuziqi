@@ -19,12 +19,12 @@ class AIEngine {
     required this.aiPlayer,
   });
 
-  int _getDepth() {
+  int _getMaxDepth() {
     switch (difficulty) {
       case Difficulty.easy:
         return 2;
       case Difficulty.medium:
-        return 4;
+        return 3;
       case Difficulty.hard:
         return 5;
     }
@@ -37,14 +37,14 @@ class AIEngine {
       case Difficulty.medium:
         return 8;
       case Difficulty.hard:
-        return 12;
+        return 15;
     }
   }
 
   Future<List<int>> getBestMove(Board board) async {
     int opponent = aiPlayer == 1 ? 2 : 1;
 
-    List<List<int>> candidates = Evaluation.getCandidates(board);
+    List<List<int>> candidates = Evaluation.getCandidates(board, radius: 3);
     candidates.removeWhere((m) => ForbiddenMoves.isForbidden(board, m[0], m[1]));
 
     if (candidates.isEmpty) {
@@ -71,14 +71,14 @@ class AIEngine {
       return [blockLiveFourMove[0], blockLiveFourMove[1], 999997];
     }
 
-    List<int> doubleLiveThreeMove = _findDoubleLiveThree(board, candidates, aiPlayer);
-    if (doubleLiveThreeMove.isNotEmpty) {
-      return [doubleLiveThreeMove[0], doubleLiveThreeMove[1], 999996];
+    List<int> chongFourMove = _findPatternMove(board, candidates, aiPlayer, PatternType.CHONG_FOUR);
+    if (chongFourMove.isNotEmpty) {
+      return [chongFourMove[0], chongFourMove[1], 999996];
     }
 
-    List<int> blockDoubleLiveThreeMove = _findDoubleLiveThree(board, candidates, opponent);
-    if (blockDoubleLiveThreeMove.isNotEmpty) {
-      return [blockDoubleLiveThreeMove[0], blockDoubleLiveThreeMove[1], 999995];
+    List<int> blockChongFourMove = _findPatternMove(board, candidates, opponent, PatternType.CHONG_FOUR);
+    if (blockChongFourMove.isNotEmpty) {
+      return [blockChongFourMove[0], blockChongFourMove[1], 999995];
     }
 
     List<int> liveThreeMove = _findPatternMove(board, candidates, aiPlayer, PatternType.LIVE_THREE);
@@ -96,19 +96,20 @@ class AIEngine {
       return [openingMove[0], openingMove[1], 50000];
     }
 
-    int depth = _getDepth();
+    int maxDepth = _getMaxDepth();
     int candidateLimit = _getCandidateLimit();
     Map<String, dynamic> args = {
       'board': board.toJson(),
-      'depth': depth,
+      'maxDepth': maxDepth,
       'aiPlayer': aiPlayer,
       'candidates': candidates,
       'candidateLimit': candidateLimit,
     };
 
     try {
-      final result = await Isolate.run(() => _minimaxAsync(args)).timeout(
-        const Duration(seconds: 10),
+      int timeoutSeconds = difficulty == Difficulty.hard ? 12 : 8;
+      final result = await Isolate.run(() => _iterativeDeepening(args)).timeout(
+        Duration(seconds: timeoutSeconds),
         onTimeout: () => [-1, -1, 0],
       );
       if (result[0] == -1) {
@@ -136,9 +137,7 @@ class AIEngine {
       Board testBoard = board.clone();
       testBoard.placeStone(move[0], move[1]);
 
-      Map<int, int> patternCounts = {};
       Set<String> evaluatedPositions = {};
-
       for (int i = 0; i < Board.SIZE; i++) {
         for (int j = 0; j < Board.SIZE; j++) {
           if (testBoard.getCell(i, j) == player) {
@@ -148,40 +147,12 @@ class AIEngine {
               evaluatedPositions.add(key);
 
               PatternResult result = Evaluation.analyzePattern(testBoard, i, j, dir, player);
-              patternCounts[result.type] = (patternCounts[result.type] ?? 0) + 1;
+              if (result.type == patternType) {
+                return move;
+              }
             }
           }
         }
-      }
-
-      if (patternCounts[patternType] != null && patternCounts[patternType]! > 0) {
-        return move;
-      }
-    }
-    return [];
-  }
-
-  List<int> _findDoubleLiveThree(Board board, List<List<int>> candidates, int player) {
-    for (var move in candidates) {
-      Board testBoard = board.clone();
-      testBoard.placeStone(move[0], move[1]);
-
-      int liveThreeCount = 0;
-      Set<String> evaluatedPositions = {};
-
-      for (var dir in Rules.DIRECTIONS) {
-        String key = '${move[0]},${move[1]},${dir[0]},${dir[1]}';
-        if (evaluatedPositions.contains(key)) continue;
-        evaluatedPositions.add(key);
-
-        PatternResult result = Evaluation.analyzePattern(testBoard, move[0], move[1], dir, player);
-        if (result.type == PatternType.LIVE_THREE) {
-          liveThreeCount++;
-        }
-      }
-
-      if (liveThreeCount >= 2) {
-        return move;
       }
     }
     return [];
@@ -216,9 +187,9 @@ class AIEngine {
     return [bestMove[0], bestMove[1], bestScore];
   }
 
-  static List<int> _minimaxAsync(Map<String, dynamic> args) {
+  static List<int> _iterativeDeepening(Map<String, dynamic> args) {
     Board board = Board.fromJson(args['board']);
-    int depth = args['depth'];
+    int maxDepth = args['maxDepth'];
     int aiPlayer = args['aiPlayer'];
     int candidateLimit = args['candidateLimit'];
     List<List<int>> candidates = [];
@@ -227,7 +198,23 @@ class AIEngine {
         candidates.add([c[0], c[1]]);
       }
     }
-    return _minimax(board, depth, -1000000, 1000000, aiPlayer, candidates, candidateLimit);
+
+    List<int> bestMove = candidates.isNotEmpty ? candidates[0] : [-1, -1];
+    int bestScore = -1000000;
+
+    for (int depth = 1; depth <= maxDepth; depth++) {
+      List<int> result = _minimax(board, depth, -1000000, 1000000, aiPlayer, candidates, candidateLimit);
+      if (result[0] != -1) {
+        bestMove = [result[0], result[1]];
+        bestScore = result[2];
+
+        if (bestScore >= 1000000) {
+          break;
+        }
+      }
+    }
+
+    return [...bestMove, bestScore];
   }
 
   static List<int> _minimax(
@@ -248,7 +235,7 @@ class AIEngine {
     }
 
     if (candidates.isEmpty) {
-      candidates = Evaluation.getCandidates(board);
+      candidates = Evaluation.getCandidates(board, radius: 2);
     }
 
     candidates.removeWhere((m) => ForbiddenMoves.isForbidden(board, m[0], m[1]));
@@ -274,7 +261,7 @@ class AIEngine {
       Board newBoard = board.clone();
       newBoard.placeStone(move[0], move[1]);
 
-      List<List<int>> newCandidates = Evaluation.getCandidates(newBoard);
+      List<List<int>> newCandidates = Evaluation.getCandidates(newBoard, radius: 2);
       List<int> result = _minimax(newBoard, depth - 1, alpha, beta, player == 1 ? 2 : 1, newCandidates, candidateLimit);
 
       if (player == 1) {
@@ -282,13 +269,17 @@ class AIEngine {
           bestScore = result[2];
           bestMove = move;
         }
-        alpha = alpha > bestScore ? alpha : bestScore;
+        if (bestScore > alpha) {
+          alpha = bestScore;
+        }
       } else {
         if (result[2] < bestScore) {
           bestScore = result[2];
           bestMove = move;
         }
-        beta = beta < bestScore ? beta : bestScore;
+        if (bestScore < beta) {
+          beta = bestScore;
+        }
       }
 
       if (beta <= alpha) {

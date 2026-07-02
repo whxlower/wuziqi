@@ -11,10 +11,7 @@ class PatternType {
   static const int SLEEP_FOUR = 6;
   static const int LIVE_FOUR = 7;
   static const int FIVE = 8;
-  static const int DOUBLE_LIVE_THREE = 9;
-  static const int LIVE_THREE_AND_LIVE_TWO = 10;
-  static const int DOUBLE_LIVE_TWO = 11;
-  static const int CHONG_FOUR = 12;
+  static const int CHONG_FOUR = 9;
 }
 
 class PatternResult {
@@ -36,10 +33,8 @@ class Evaluation {
   static const int LIVE_FOUR = 100000;
   static const int CHONG_FOUR = 50000;
   static const int LIVE_THREE = 10000;
-  static const int DOUBLE_LIVE_THREE = 50000;
   static const int SLEEP_THREE = 3000;
   static const int LIVE_TWO = 1000;
-  static const int DOUBLE_LIVE_TWO = 5000;
   static const int SLEEP_TWO = 300;
   static const int ONE = 50;
   static const int CENTER_BONUS = 10;
@@ -48,24 +43,46 @@ class Evaluation {
     int score = 0;
     int opponent = player == 1 ? 2 : 1;
 
-    score += _evaluatePlayer(board, player);
-    score -= _evaluatePlayer(board, opponent);
+    int attackScore = _evaluatePlayer(board, player);
+    int defenseScore = _evaluatePlayer(board, opponent);
+
+    score = attackScore - defenseScore;
+
+    return score;
+  }
+
+  static int evaluateMoveAttack(Board board, int row, int col, int player) {
+    if (!board.isEmpty(row, col)) return -1000000;
+
+    Board testBoard = board.clone();
+    testBoard.placeStone(row, col);
+
+    return _evaluatePlayer(testBoard, player);
+  }
+
+  static int evaluateMoveDefense(Board board, int row, int col, int player) {
+    if (!board.isEmpty(row, col)) return -1000000;
+
+    int opponent = player == 1 ? 2 : 1;
+    return _evaluatePlayer(board, opponent);
+  }
+
+  static int evaluateMove(Board board, int row, int col, int player) {
+    if (!board.isEmpty(row, col)) return -1000000;
+
+    int attackScore = evaluateMoveAttack(board, row, col, player);
+    int defenseScore = evaluateMoveDefense(board, row, col, player);
+
+    int score = attackScore + defenseScore;
+
+    int centerBonus = CENTER_BONUS - (row - 7).abs() - (col - 7).abs();
+    score += centerBonus;
 
     return score;
   }
 
   static int _evaluatePlayer(Board board, int player) {
     int score = 0;
-
-    Map<int, int> patternCounts = {
-      PatternType.FIVE: 0,
-      PatternType.LIVE_FOUR: 0,
-      PatternType.CHONG_FOUR: 0,
-      PatternType.LIVE_THREE: 0,
-      PatternType.SLEEP_THREE: 0,
-      PatternType.LIVE_TWO: 0,
-      PatternType.SLEEP_TWO: 0,
-    };
 
     Set<String> evaluatedPositions = {};
 
@@ -78,34 +95,36 @@ class Evaluation {
             evaluatedPositions.add(key);
 
             PatternResult result = analyzePattern(board, i, j, dir, player);
-            patternCounts[result.type] = (patternCounts[result.type] ?? 0) + 1;
+            score += _patternScore(result);
           }
         }
       }
     }
 
-    if (patternCounts[PatternType.FIVE]! > 0) return WIN_SCORE;
-    if (patternCounts[PatternType.LIVE_FOUR]! > 0) return LIVE_FOUR;
-
-    score += patternCounts[PatternType.CHONG_FOUR]! * CHONG_FOUR;
-
-    if (patternCounts[PatternType.LIVE_THREE]! >= 2) {
-      score += DOUBLE_LIVE_THREE;
-    } else {
-      score += patternCounts[PatternType.LIVE_THREE]! * LIVE_THREE;
-    }
-
-    score += patternCounts[PatternType.SLEEP_THREE]! * SLEEP_THREE;
-
-    if (patternCounts[PatternType.LIVE_TWO]! >= 2) {
-      score += DOUBLE_LIVE_TWO;
-    } else {
-      score += patternCounts[PatternType.LIVE_TWO]! * LIVE_TWO;
-    }
-
-    score += patternCounts[PatternType.SLEEP_TWO]! * SLEEP_TWO;
-
     return score;
+  }
+
+  static int _patternScore(PatternResult result) {
+    switch (result.type) {
+      case PatternType.FIVE:
+        return WIN_SCORE;
+      case PatternType.LIVE_FOUR:
+        return LIVE_FOUR;
+      case PatternType.CHONG_FOUR:
+        return CHONG_FOUR;
+      case PatternType.LIVE_THREE:
+        return LIVE_THREE;
+      case PatternType.SLEEP_THREE:
+        return SLEEP_THREE;
+      case PatternType.LIVE_TWO:
+        return LIVE_TWO;
+      case PatternType.SLEEP_TWO:
+        return SLEEP_TWO;
+      case PatternType.ONE:
+        return ONE;
+      default:
+        return 0;
+    }
   }
 
   static PatternResult analyzePattern(
@@ -168,9 +187,6 @@ class Evaluation {
       if (totalOpen == 2) {
         return PatternResult(PatternType.LIVE_THREE, count, leftOpen, rightOpen);
       }
-      if (totalOpen == 1) {
-        return PatternResult(PatternType.SLEEP_THREE, count, leftOpen, rightOpen);
-      }
       return PatternResult(PatternType.SLEEP_THREE, count, leftOpen, rightOpen);
     }
 
@@ -178,57 +194,20 @@ class Evaluation {
       if (totalOpen == 2) {
         return PatternResult(PatternType.LIVE_TWO, count, leftOpen, rightOpen);
       }
-      if (totalOpen == 1) {
-        return PatternResult(PatternType.SLEEP_TWO, count, leftOpen, rightOpen);
-      }
       return PatternResult(PatternType.SLEEP_TWO, count, leftOpen, rightOpen);
     }
 
     return PatternResult(PatternType.ONE, count, leftOpen, rightOpen);
   }
 
-  static int evaluateMove(Board board, int row, int col, int player) {
-    if (!board.isEmpty(row, col)) return -1000000;
-
-    int score = 0;
-    int opponent = player == 1 ? 2 : 1;
-
-    Board testBoard = board.clone();
-    testBoard.placeStone(row, col);
-
-    score += _evaluatePlayer(testBoard, player);
-
-    Map<int, int> oppPatternCounts = {};
-    for (var dir in Rules.DIRECTIONS) {
-      PatternResult result = analyzePattern(board, row, col, dir, opponent);
-      int type = result.type;
-      oppPatternCounts[type] = (oppPatternCounts[type] ?? 0) + 1;
-    }
-
-    if (oppPatternCounts[PatternType.LIVE_FOUR] != null) {
-      score += LIVE_FOUR;
-    }
-    if (oppPatternCounts[PatternType.CHONG_FOUR] != null) {
-      score += CHONG_FOUR;
-    }
-    if (oppPatternCounts[PatternType.LIVE_THREE] != null) {
-      score += LIVE_THREE;
-    }
-
-    int centerBonus = CENTER_BONUS - (row - 7).abs() - (col - 7).abs();
-    score += centerBonus;
-
-    return score;
-  }
-
-  static List<List<int>> getCandidates(Board board) {
+  static List<List<int>> getCandidates(Board board, {int radius = 2}) {
     Set<String> candidateSet = {};
 
     for (int i = 0; i < Board.SIZE; i++) {
       for (int j = 0; j < Board.SIZE; j++) {
         if (board.getCell(i, j) != 0) {
-          for (int dr = -2; dr <= 2; dr++) {
-            for (int dc = -2; dc <= 2; dc++) {
+          for (int dr = -radius; dr <= radius; dr++) {
+            for (int dc = -radius; dc <= radius; dc++) {
               int nr = i + dr;
               int nc = j + dc;
               if (nr >= 0 && nr < Board.SIZE && nc >= 0 && nc < Board.SIZE) {

@@ -77,7 +77,7 @@ class Evaluation {
             if (evaluatedPositions.contains(key)) continue;
             evaluatedPositions.add(key);
 
-            PatternResult result = _analyzePattern(board, i, j, dir, player);
+            PatternResult result = analyzePattern(testBoard, i, j, dir, player);
             patternCounts[result.type] = (patternCounts[result.type] ?? 0) + 1;
           }
         }
@@ -108,7 +108,7 @@ class Evaluation {
     return score;
   }
 
-  static PatternResult _analyzePattern(
+  static PatternResult analyzePattern(
     Board board,
     int row,
     int col,
@@ -118,8 +118,6 @@ class Evaluation {
     int count = 1;
     int leftOpen = 0;
     int rightOpen = 0;
-    int leftBlock = 0;
-    int rightBlock = 0;
 
     int r = row - dir[0];
     int c = col - dir[1];
@@ -131,7 +129,6 @@ class Evaluation {
         leftOpen = 1;
         break;
       } else {
-        leftBlock = 1;
         break;
       }
       r -= dir[0];
@@ -148,7 +145,6 @@ class Evaluation {
         rightOpen = 1;
         break;
       } else {
-        rightBlock = 1;
         break;
       }
       r += dir[0];
@@ -156,7 +152,6 @@ class Evaluation {
     }
 
     int totalOpen = leftOpen + rightOpen;
-    int totalBlock = leftBlock + rightBlock;
 
     if (count >= 5) {
       return PatternResult(PatternType.FIVE, count, leftOpen, rightOpen);
@@ -205,7 +200,7 @@ class Evaluation {
 
     Map<int, int> oppPatternCounts = {};
     for (var dir in Rules.DIRECTIONS) {
-      PatternResult result = _analyzePattern(board, row, col, dir, opponent);
+      PatternResult result = analyzePattern(board, row, col, dir, opponent);
       int type = result.type;
       oppPatternCounts[type] = (oppPatternCounts[type] ?? 0) + 1;
     }

@@ -61,12 +61,12 @@ class AIEngine {
       return [blockMove[0], blockMove[1], 999999];
     }
 
-    List<int> liveFourMove = _findPatternMove(board, candidates, aiPlayer, Evaluation.PatternType.LIVE_FOUR);
+    List<int> liveFourMove = _findPatternMove(board, candidates, aiPlayer, PatternType.LIVE_FOUR);
     if (liveFourMove.isNotEmpty) {
       return [liveFourMove[0], liveFourMove[1], 999998];
     }
 
-    List<int> blockLiveFourMove = _findPatternMove(board, candidates, opponent, Evaluation.PatternType.LIVE_FOUR);
+    List<int> blockLiveFourMove = _findPatternMove(board, candidates, opponent, PatternType.LIVE_FOUR);
     if (blockLiveFourMove.isNotEmpty) {
       return [blockLiveFourMove[0], blockLiveFourMove[1], 999997];
     }
@@ -81,12 +81,12 @@ class AIEngine {
       return [blockDoubleLiveThreeMove[0], blockDoubleLiveThreeMove[1], 999995];
     }
 
-    List<int> liveThreeMove = _findPatternMove(board, candidates, aiPlayer, Evaluation.PatternType.LIVE_THREE);
+    List<int> liveThreeMove = _findPatternMove(board, candidates, aiPlayer, PatternType.LIVE_THREE);
     if (liveThreeMove.isNotEmpty) {
       return [liveThreeMove[0], liveThreeMove[1], 100000];
     }
 
-    List<int> blockLiveThreeMove = _findPatternMove(board, candidates, opponent, Evaluation.PatternType.LIVE_THREE);
+    List<int> blockLiveThreeMove = _findPatternMove(board, candidates, opponent, PatternType.LIVE_THREE);
     if (blockLiveThreeMove.isNotEmpty) {
       return [blockLiveThreeMove[0], blockLiveThreeMove[1], 99000];
     }
@@ -147,7 +147,7 @@ class AIEngine {
               if (evaluatedPositions.contains(key)) continue;
               evaluatedPositions.add(key);
 
-              Evaluation.PatternResult result = Evaluation._analyzePattern(testBoard, i, j, dir, player);
+              PatternResult result = Evaluation.analyzePattern(testBoard, i, j, dir, player);
               patternCounts[result.type] = (patternCounts[result.type] ?? 0) + 1;
             }
           }
@@ -174,8 +174,8 @@ class AIEngine {
         if (evaluatedPositions.contains(key)) continue;
         evaluatedPositions.add(key);
 
-        Evaluation.PatternResult result = Evaluation._analyzePattern(testBoard, move[0], move[1], dir, player);
-        if (result.type == Evaluation.PatternType.LIVE_THREE) {
+        PatternResult result = Evaluation.analyzePattern(testBoard, move[0], move[1], dir, player);
+        if (result.type == PatternType.LIVE_THREE) {
           liveThreeCount++;
         }
       }
